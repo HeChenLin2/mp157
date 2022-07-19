@@ -1,0 +1,187 @@
+
+
+
+/dts-v1/;
+#include "stm32mp157.dtsi"
+#include "stm32mp15xa.dtsi"
+#include "stm32mp15-pinctrl.dtsi"
+#include "stm32mp15xxaa-pinctrl.dtsi"
+#include "stm32mp157-hbb.dtsi"
+/ { 
+	model = "HQYJ STM32MP157 FSMP1A Discovery Board";
+	compatible = "st,stm32mp157a-dk1", "st,stm32mp157";
+
+//测试
+
+    hbb_led{
+        compatible = "stm32mp157 hbb_led";
+        led-gpios = <&gpioe 10 GPIO_ACTIVE_HIGH>,
+                    <&gpiof 10 GPIO_ACTIVE_HIGH>,
+                    <&gpioe 8 GPIO_ACTIVE_HIGH>,
+                    <&gpioz 5 GPIO_ACTIVE_HIGH>,
+                    <&gpioz 6 GPIO_ACTIVE_HIGH>,
+                    <&gpioz 7 GPIO_ACTIVE_HIGH>;
+        default-state = "okey";
+    };
+
+    hbb_key{
+        compatible = "stm32mp157_hbb_key";
+        key-gpios = <&gpioa 0 GPIO_ACTIVE_HIGH>,
+                    <&gpiof 9 GPIO_ACTIVE_HIGH>,
+                    <&gpiof 7 GPIO_ACTIVE_HIGH>,
+                    <&gpiof 8 GPIO_ACTIVE_HIGH>;
+        default-state = "okey";
+    };
+
+
+    hbb_RDA226{
+        compatible = "stm32mp157,RDA226";
+        rda-gpios = <&gpiof 12 GPIO_ACTIVE_HIGH>;
+        default-state = "okey";
+    
+    };
+
+    hbb_beep{
+        compatible = "stm32mp157,beep";
+        status = "okay";
+        pwms=<&pwm4_beep 0 1000000>;
+        pwm-names = "beep";
+    };
+
+	aliases {
+		serial0 = &uart4;
+        serial5 = &usart3;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	reserved-memory {
+		gpu_reserved: gpu@da000000 {
+		      reg = <0xda000000 0x4000000>;
+		      no-map;
+	      };
+
+	optee_memory: optee@0xde000000 { 
+		      reg = <0xde000000 0x02000000>;
+		      no-map;
+	      };
+	};
+
+    usb_phy_tuning: usb-phy-tuning {
+		st,hs-dc-level = <2>;
+		st,fs-rftime-tuning;
+	    st,hs-rftime-reduction;
+		st,hs-current-trim = <15>;
+	    st,hs-impedance-trim = <1>;
+		st,squelch-level = <3>;
+		st,hs-rx-offset = <2>;
+		st,no-lsfs-sc;
+		};
+};
+
+
+
+&optee {
+	status = "okay";
+};
+
+
+
+&pinctrl {
+
+    pwm4_pins_c:pwm4-0{
+        pins{
+            pinmux = <STM32_PINMUX('B',6,AF2)>;
+            bias-pull-down;
+            driver-push-pull;
+            slew-rate = <0>;
+        };
+    };
+
+
+    pwm4_sleep_pins_c:pwm4-sleep-0{
+        pins {
+            pinmux = <STM32_PINMUX('B',6,ANALOG)>; 
+            };
+        };
+
+
+    i2c1_pins_c:i2c-4 {
+        pins {
+            pinmux = <STM32_PINMUX('F', 14,AF5)>,
+                    <STM32_PINMUX('F',15,AF5)>;
+        bias-disable;       //pull失能，与bias-pull-down/up冲突
+        drive-open-drain;   //开漏输出
+        slew-rate = <0>;    //输入
+        };                      
+     };
+
+
+
+    i2c1_sleep_pins_c:12c-sleep-5{
+        pins {
+            pinmux = <STM32_PINMUX('F', 14,ANALOG)>,
+                    <STM32_PINMUX('F',15,ANALOG)>;
+        };                
+    };
+};
+
+&timers4 {
+    status = "okay";
+    pwm4_beep: pwm_beep {
+        compatible = "st,stm32-pwm";
+        pinctrl-0 = <&pwm4_pins_c>;
+        pinctrl-names = "default";
+        status = "okay";
+        #pwm-cells = <2>;
+    };
+};
+
+&i2c1{
+    pinctrl-names = "default","sleep";
+    pinctrl-0 = <&i2c1_pins_c>;
+    pinctrl-1 = <&i2c1_sleep_pins_c>;
+    status = "okay";
+    si7006:i2c1_7006@40{
+        compatible = "stm32mp157,si7006";
+        reg = <0x40>;
+    };
+    ap3216c:i2c1_ap3216c@1e{
+        compatible = "stm32mp157,ap3216c";
+        reg = <0x1e>;
+        irq-gpios = <&gpiof 13 GPIO_ACTIVE_HIGH>;
+    };
+};
+
+
+&spi4{
+    status = "okay";
+    pinctrl-names = "default", "sleep";
+    pinctrl-0 = <&spi4_pins_a>;
+    pinctrl-1 = <&spi4_sleep_pins_a>;
+    cs-gpios = <&gpioe 11 0>;
+    digital_pipe:m74hc595@0{
+        compatible = "stm32mp157,m74hc595";
+        reg = <0>;
+        spi-max-frequency = <1000000>;        // spi 最大速率配置
+    };
+
+};
+
+
+&usbphyc { 
+    status = "okay"; 
+};
+
+&usbphyc_port0 { 
+    phy-supply = <&v3v3>;
+    st,phy-tuning = <&usb_phy_tuning>;
+};
+
+&usbh_ehci {
+    phys = <&usbphyc_port0>;
+    status = "okay"; 
+};
+
