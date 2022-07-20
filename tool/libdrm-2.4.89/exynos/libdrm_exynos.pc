@@ -1,0 +1,11 @@
+prefix=/home/hcl/6_mp157摄像头数据实时显示到lcd屏幕/mp157/tool/libdrm-2.4.89/_install
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libdrm_exynos
+Description: Userspace interface to exynos kernel DRM services
+Version: 0.7
+Libs: -L${libdir} -ldrm_exynos
+Cflags: -I${includedir} -I${includedir}/libdrm -I${includedir}/exynos
+Requires.private: libdrm
