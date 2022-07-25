@@ -1,4 +1,4 @@
-prefix=/home/hcl/6_mp157摄像头数据实时显示到lcd屏幕/mp157/tool/libdrm-2.4.89/_install
+prefix=/home/hcl/6_mp157_git/mp157/tool/libdrm-2.4.89/_install
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include
