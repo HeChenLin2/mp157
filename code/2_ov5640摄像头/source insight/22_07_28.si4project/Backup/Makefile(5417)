@@ -1,14 +1,17 @@
 CC=arm-none-linux-gnueabihf-gcc
 
 target =main
+
 target1=main
 target2=drmFun
 target3=bmp
+target4=cameraFun
 
 LIB+=/home/hcl/mp157_work/tool/arm-none-linux-gnueabihf/gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf/arm-none-linux-gnueabihf/lib/libdrm
 
 all:
-	$(CC) $(target1).c $(target2).c $(target3).c -o $(target) -L $(LIB) -ldrm
+	cp /mnt/hgfs/ubuntu_share/1_drm框架显示图像/* ./ -rf
+	$(CC) $(target1).c $(target2).c $(target3).c $(target4).c -o $(target) -L $(LIB) -ldrm -lpthread
 
 clean:
 	rm $(target)
