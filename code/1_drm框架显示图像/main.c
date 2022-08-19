@@ -76,7 +76,7 @@ int bmpmode = 0;	//0:rgb565 	1:rgb888
 	
 	
 	
-	
+drm_draw_background();	
 	
 	
 	drm_free_fb(fd);

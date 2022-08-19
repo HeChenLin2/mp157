@@ -72,7 +72,6 @@ int bmpmode = 0;	//0:rgb565 	1:rgb888
 	}
 	
 	/**************************************************************************/
-	
 	pthread_join(camera.tid[0],NULL);
 	pthread_join(camera.tid[1],NULL);
 	pthread_join(kms.tid,NULL);

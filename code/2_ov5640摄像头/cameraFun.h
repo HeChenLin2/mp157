@@ -38,8 +38,11 @@ typedef struct VideoBuffer		/*	用于存放数据帧信息		*/
 	int fd;
 	int uCount;		//缓冲帧个数
 	int	nCount;		//当前读出的缓冲帧下标
-	unsigned char * rgbdata1;			//保存转换后rgb的数据地址
-	unsigned char * rgbdata2;			//保存转换后rgb的数据地址
+	//unsigned char * rgbdata1;			//保存转换后rgb的数据地址
+	//unsigned char * rgbdata2;			//保存转换后rgb的数据地址
+	unsigned char * rgbdata[5];
+	sem_t *  sem;
+	
 	struct v4l2_capability cap;
 	struct v4l2_fmtdesc desc;
 	struct v4l2_frmsizeenum frmsize;
@@ -47,9 +50,9 @@ typedef struct VideoBuffer		/*	用于存放数据帧信息		*/
     struct v4l2_buffer buf;				/*	驱动中的一帧数据，保存内核中帧缓存的相关信息的结构体*/
     struct v4l2_requestbuffers rb;
 	VideoBuffer * pBuffers;
-	sem_t sem;
+	
 	int msg_id;
-	pthread_t tid[2];
+	pthread_t * tid;
 }cameraInf_t;
 
 

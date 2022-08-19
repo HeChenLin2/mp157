@@ -63,8 +63,7 @@ int camera_open(char * devname,struct cameraInf * camera)
     }
 	printf("**************************************************\r\n");	
 	camera->fd = fd;
-	//sem_init(&camera->sem,0,0);
-	camera->msg_id = createMsgQueue();
+	
   	return 0;
 err2:
 	close(fd);
@@ -108,7 +107,7 @@ int v4l2_init(struct cameraInf * camera)
    }
 
    /***********向内核申请帧缓存*********/
-   camera->uCount = 5;
+   camera->uCount = 4;
    memset(&camera->rb, 0, sizeof(camera->rb));
    camera->rb.count = camera->uCount;				/*	缓存数量--->  数据帧的个数	*/
    camera->rb.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;	/*	数据帧流类型	*/
@@ -122,6 +121,7 @@ int v4l2_init(struct cameraInf * camera)
 
 	if((camera->rb.count < 2) || (camera->rb.count > 5))
      {
+     	printf("缓冲帧个数太大或太小\r\n");
        return	-1;			/*	保证帧缓存的数量不易太大也不易太小*/
      }
 
@@ -173,6 +173,25 @@ int v4l2_init(struct cameraInf * camera)
 		int n = 2;
 		if(bmpmode)
 			n = 3;
+
+		/*申请一些内存空间*/
+		camera->tid = NULL;
+		camera->tid = (pthread_t *)malloc(sizeof(pthread_t) * (camera->uCount + 1)  );	//每个缓冲帧都有一个线程来处理
+		camera->sem = NULL;
+		camera->sem = (sem_t *)malloc(sizeof(sem_t) * (camera->uCount)  );
+		
+		for(int i = 0;i < camera->uCount;i++){
+			camera->rgbdata[i] = NULL;
+			camera->rgbdata[i] = (unsigned char *)malloc(sizeof(unsigned char) * camera->fmt.fmt.pix.width * camera->fmt.fmt.pix.height * n );
+			if(camera->rgbdata[i] == NULL){
+				printf("rgbdata[%d] malloc rgbdata fail\r\n",i);
+				return -1;
+			}
+			sem_init(&camera->sem[i],0,0);
+		}
+		camera->msg_id = createMsgQueue();
+		
+		#if 0
 		camera->rgbdata1 = NULL;
 		camera->rgbdata1 = (unsigned char *)malloc(sizeof(unsigned char) * camera->fmt.fmt.pix.width * camera->fmt.fmt.pix.height * n );
 		if(camera->rgbdata1 == NULL){
@@ -187,6 +206,7 @@ int v4l2_init(struct cameraInf * camera)
 			printf("malloc rgbdata fail\r\n");
 			return -1;
 		}
+		#endif
 		
 		yuv_rgb_table_init();
 	}
@@ -207,21 +227,24 @@ int v4l2_init(struct cameraInf * camera)
 void free_v4l2_memory(struct cameraInf * camera)
 {
 	unsigned int numBufs = 0;
+	int i = 0;
 	for(numBufs = 0; numBufs < camera->uCount; numBufs++)	/*	映射所有的帧缓存	*/
 	{
 		if(camera->pBuffers[numBufs].pStart != NULL)
 			munmap(camera->pBuffers[numBufs].pStart, camera->pBuffers[numBufs].uLength);//解除隐射才能释放cache空间
 	}
 
-	if(camera->pBuffers != NULL)
-		free(camera->pBuffers);
+	if(camera->tid != NULL)
+		free(camera->tid);
 
-	if(camera->rgbdata1 != NULL)
-		free(camera->rgbdata1);
+	if(camera->sem != NULL)
+		free(camera->sem);
 
-	if(camera->rgbdata2 != NULL)
-		free(camera->rgbdata2);
+	for( i = 0;i < camera->uCount;i++)
+		if(camera->rgbdata[i] != NULL)
+			free(camera->rgbdata[i]);
 }
+
 
 void timec(void)
 {
@@ -236,7 +259,7 @@ void timec(void)
  
 }
 
-
+#if 0
 /************************************************************************
 *函数名字：thread_fun
 *函数功能：线程函数，循环获取摄像头数据
@@ -274,6 +297,7 @@ static void * thread_fun(void * arg)
 	while(1){
 		poll(fd, 1, -1);
 		if(fd[0].revents & POLLIN){		//有摄像头数据
+
 			//出队
 			ret = ioctl(camera->fd, VIDIOC_DQBUF, &tV4l2Buf);
 			if(ret < 0){
@@ -305,6 +329,98 @@ static void * thread_fun(void * arg)
 	}
 	return NULL;
 }
+#endif
+
+
+
+static void * ProcessingImages (void * arg)
+{
+	int who = 0,ret = 0;
+	struct v4l2_buffer tV4l2Buf;
+	struct cameraInf * camera = (struct cameraInf *)arg;
+
+	
+	for(int i = 1; i < camera->uCount + 1;i++ )		//确定自己是第几个处理图像的线程
+		if(camera->tid[i] == pthread_self()){
+			who = i;
+			break;
+		}
+
+	tV4l2Buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    tV4l2Buf.memory = V4L2_MEMORY_MMAP;
+	tV4l2Buf.index = who - 1;
+	while(1)
+	{
+		
+		sem_wait(&camera->sem[who-1]);
+		switch(camera->fmt.fmt.pix.pixelformat)
+		{
+			case V4L2_PIX_FMT_YUYV:
+				convert_yuv_to_rgb565_buffer(camera->pBuffers[tV4l2Buf.index].pStart, camera->rgbdata[who-1], camera->fmt.fmt.pix.width,camera->fmt.fmt.pix.height);
+				sendMsgQueue( camera->msg_id , 1234, who-1);	//写入消息队列,传递给写入lcd的线程
+				break;
+			
+		}
+		//printf("--ProcessingImages =%d--\r\n",tV4l2Buf.index);
+	
+	  	//入队
+	 	ret = ioctl(camera->fd, VIDIOC_QBUF, &tV4l2Buf);
+		if (ret < 0)
+		{
+			 printf("Unable to queue buffer.\n");
+			 return NULL;
+		}
+
+	}
+	return NULL;
+}
+
+
+
+/************************************************************************
+*函数名字：thread_fun
+*函数功能：线程函数，循环获取摄像头数据
+*函数参数：arg：struct cameraInf结构体指针
+*函数返回：无意义
+**************************************************************************/
+static void * thread_fun(void * arg)
+{
+	int ret;
+	struct v4l2_buffer tV4l2Buf;
+	struct cameraInf * camera = (struct cameraInf *)arg;
+	struct pollfd fd[1] = {
+		[0] = {
+			.fd = camera->fd,
+			.events = POLLIN,
+		}
+	};
+
+	tV4l2Buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    tV4l2Buf.memory = V4L2_MEMORY_MMAP;
+
+	for(int i = 1;i < camera->uCount + 1;i++)
+		if(pthread_create(&camera->tid[i], NULL,ProcessingImages, (void *)camera) != 0){
+			printf("camera->tid[i] camera pthread_create fail\r\n",i);
+			return NULL;
+		}
+
+	while(1){
+		poll(fd, 1, -1);
+		if(fd[0].revents & POLLIN){		//有摄像头数据
+
+			//出队
+			ret = ioctl(camera->fd, VIDIOC_DQBUF, &tV4l2Buf);
+			if(ret < 0){
+				printf("Unable to dequeue buffer.\n");
+				return NULL;
+			}
+			sem_post( &camera->sem[tV4l2Buf.index] );
+			
+		}
+	}
+	return NULL;
+}
+
 
 
 /************************************************************************
@@ -326,12 +442,9 @@ int camera_thread(struct cameraInf * camera)
     }
 	 
 	if(pthread_create(&camera->tid[0], NULL,thread_fun, (void *)camera) != 0){
-		printf("camera pthread_create fail\r\n");
+		printf("camera->tid[0] camera pthread_create fail\r\n");
 		return -1;
 	}
-	
-
-
 	return 0;
 }
 

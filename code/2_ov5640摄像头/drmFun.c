@@ -332,16 +332,19 @@ void drm_draw_background(void)
 static void * thread_fun(void * arg)
 {
 	int i = 0,who = 0;
+	int x = 0,y = 0,z = 0,j = 0;
 	while(1)
 	{
-		//sem_wait(&camera.sem);
 		who = recvMsgQueue(camera.msg_id, 1234);
-		if(who == 1)
-			lcd_show_camear(camera.rgbdata1,camera.fmt.fmt.pix.width,camera.fmt.fmt.pix.height);
-		if(who == 2)
-			lcd_show_camear(camera.rgbdata2,camera.fmt.fmt.pix.width,camera.fmt.fmt.pix.height);
+		lcd_show_camear(camera.rgbdata[who],camera.fmt.fmt.pix.width,camera.fmt.fmt.pix.height);
+		if(who == 0) x++;
+		else if(who == 1) y++;
+		else if(who == 2) z++;
+		else if(who == 3) j++;
+		
 		if(i == 0 || i == 100){
 				timec();
+				printf("--%d--%d--%d--%d--\r\n",x,y,z,j);
 			}
 		i++;
 	}
